@@ -137,6 +137,14 @@ function TreeView:update()
 end
 
 
+function TreeView:on_drag_resize(axis, size)
+  if axis == "x" then
+    config.treeview_size = size
+    self.size.x = size
+  end
+end
+
+
 function TreeView:draw()
   self:draw_background(style.background2)
 

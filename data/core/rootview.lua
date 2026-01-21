@@ -449,12 +449,28 @@ end
 function RootView:on_mouse_moved(x, y, dx, dy)
   if self.dragged_divider then
     local node = self.dragged_divider
-    if node.type == "hsplit" then
-      node.divider = node.divider + dx / node.size.x
+    local locked_a = node.a and node.a.locked
+    local locked_b = node.b and node.b.locked
+    if locked_a ~= locked_b then
+      local locked = locked_a and node.a or node.b
+      local axis = node.type == "hsplit" and "x" or "y"
+      local delta = node.type == "hsplit" and dx or dy
+      local sign = locked_a and 1 or -1
+      local min_size = 1
+      local max_size = math.max(min_size, node.size[axis] - style.divider_size - min_size)
+      local new_size = common.clamp(locked.active_view.size[axis] + delta * sign, min_size, max_size)
+      locked.active_view.size[axis] = new_size
+      if locked.active_view.on_drag_resize then
+        locked.active_view:on_drag_resize(axis, new_size)
+      end
     else
-      node.divider = node.divider + dy / node.size.y
+      if node.type == "hsplit" then
+        node.divider = node.divider + dx / node.size.x
+      else
+        node.divider = node.divider + dy / node.size.y
+      end
+      node.divider = common.clamp(node.divider, 0.01, 0.99)
     end
-    node.divider = common.clamp(node.divider, 0.01, 0.99)
     return
   end
 
