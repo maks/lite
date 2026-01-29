@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Lite
+Comment=Launch Lite
+Exec=env LITE_SCALE=2 /home/maks/apps/lite/lite
+Icon=/home/maks/apps/lite/icon.png
+Terminal=false
+Categories=Utility;
