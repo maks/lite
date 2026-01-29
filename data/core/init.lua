@@ -113,7 +113,14 @@ function core.init()
   core.add_thread(project_scan_thread)
   command.add_defaults()
   local got_plugin_error = not core.load_plugins()
-  local got_user_error = not core.try(require, "user")
+  local got_user_error = false
+  do
+    local home = os.getenv("HOME")
+    local user_file = home and (home .. "/.lite/user.lua") or nil
+    if user_file and system.get_file_info(user_file) then
+      got_user_error = not core.try(dofile, user_file)
+    end
+  end
   local got_project_error = not core.load_project_module()
 
   for _, filename in ipairs(files) do

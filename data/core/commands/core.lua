@@ -85,7 +85,17 @@ command.add(nil, {
   end,
 
   ["core:open-user-module"] = function()
-    core.root_view:open_doc(core.open_doc(EXEDIR .. "/data/user/init.lua"))
+    local home = os.getenv("HOME")
+    local user_file = home and (home .. "/.lite/user.lua") or nil
+    if user_file and system.get_file_info(user_file) then
+      core.root_view:open_doc(core.open_doc(user_file))
+      return
+    end
+    local doc = core.open_doc()
+    core.root_view:open_doc(doc)
+    if user_file then
+      doc:save(user_file)
+    end
   end,
 
   ["core:open-project-module"] = function()
