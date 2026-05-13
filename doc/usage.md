@@ -144,3 +144,21 @@ require "user.colors.winter"
 
 Color themes can be downloaded from the [color themes repository](https://github.com/rxi/lite-colors).
 
+
+## Multicursor Editing
+lite supports editing with multiple cursors simultaneously. Most editing and
+movement commands will apply to all active cursors.
+
+### Shortcuts
+* **`ctrl+click`** — Add a new cursor at the mouse position.
+* **`alt+shift+up`** — Create a new cursor on the line above the current one.
+* **`alt+shift+down`** — Create a new cursor on the line below the current one.
+* **`escape`** — Clear all extra cursors and return to a single selection.
+
+Holding **`shift`** while using movement keys will extend the selections for all
+active cursors.
+
+When multiple cursors overlap or occupy the same position, they will
+automatically merge into a single cursor. Undo and redo operations treat
+multi-cursor edits as a single atomic action.
+
