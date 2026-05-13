@@ -43,6 +43,15 @@ have been loaded.
 The user module can be modified by running the `core:open-user-module` command
 or otherwise directly opening the `data/user/init.lua` file.
 
+### Window size
+
+You can set the initial size in the `~/lite/user.lua`  user file like so, note
+use of the `SCALE` constant that is set by the `LITE_SCALE` env var.
+
+```
+-- Set initial window size
+system.set_window_size(SCALE * 800, SCALE * 600)
+```
 
 ## Project Module
 The project module is an optional module which is loaded from the current
@@ -161,4 +170,3 @@ active cursors.
 When multiple cursors overlap or occupy the same position, they will
 automatically merge into a single cursor. Undo and redo operations treat
 multi-cursor edits as a single atomic action.
-

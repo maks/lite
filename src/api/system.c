@@ -191,6 +191,14 @@ static int f_set_window_mode(lua_State *L) {
 }
 
 
+static int f_set_window_size(lua_State *L) {
+  int w = luaL_checknumber(L, 1);
+  int h = luaL_checknumber(L, 2);
+  SDL_SetWindowSize(window, w, h);
+  return 0;
+}
+
+
 static int f_window_has_focus(lua_State *L) {
   unsigned flags = SDL_GetWindowFlags(window);
   lua_pushboolean(L, flags & SDL_WINDOW_INPUT_FOCUS);
@@ -385,6 +393,7 @@ static const luaL_Reg lib[] = {
   { "set_cursor",          f_set_cursor          },
   { "set_window_title",    f_set_window_title    },
   { "set_window_mode",     f_set_window_mode     },
+  { "set_window_size",     f_set_window_size     },
   { "window_has_focus",    f_window_has_focus    },
   { "show_confirm_dialog", f_show_confirm_dialog },
   { "chdir",               f_chdir               },
