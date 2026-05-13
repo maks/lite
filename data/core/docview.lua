@@ -224,9 +224,10 @@ function DocView:on_mouse_pressed(button, x, y, clicks)
       local line2, col2 = self:resolve_screen_position(x, y)
       self.doc:set_selection(line2, col2, line1, col1)
     end
-  elseif keymap.modkeys["ctrl"] or (system.get_platform() == "macos" and keymap.modkeys["cmd"]) then
+  elseif keymap.modkeys["ctrl"] or (PLATFORM == "Mac OS X" and keymap.modkeys["cmd"]) then
     local line, col = self:resolve_screen_position(x, y)
-    self.doc:add_selection(line, col)
+    local l1, c1, l2, c2 = mouse_selection(self.doc, clicks, line, col, line, col)
+    self.doc:add_selection(l1, c1, l2, c2)
     self.mouse_selecting = { line, col, clicks = clicks, idx = #self.doc.selections / 4 }
   else
     local line, col = self:resolve_screen_position(x, y)
@@ -234,6 +235,7 @@ function DocView:on_mouse_pressed(button, x, y, clicks)
     self.mouse_selecting = { line, col, clicks = clicks }
   end
   self.blink_timer = 0
+  core.redraw = true
 end
 
 
@@ -341,9 +343,9 @@ function DocView:draw_line_body(idx, x, y)
   and self.blink_timer < blink_period / 2
   and system.window_has_focus() then
     for i = 1, #self.doc.selections, 4 do
-      local l2, c2 = self.doc.selections[i+2], self.doc.selections[i+3]
-      if l2 == idx then
-        local x1 = x + self:get_col_x_offset(l2, c2)
+      local l1, c1 = self.doc.selections[i], self.doc.selections[i+1]
+      if l1 == idx then
+        local x1 = x + self:get_col_x_offset(l1, c1)
         renderer.draw_rect(x1, y, style.caret_width, lh, style.caret)
       end
     end

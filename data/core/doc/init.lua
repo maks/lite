@@ -120,10 +120,14 @@ end
 
 
 function Doc:set_selection(line1, col1, line2, col2, swap)
-  assert(not line2 == not col2, "expected 2 or 4 arguments")
-  if swap then line1, col1, line2, col2 = line2, col2, line1, col1 end
-  line1, col1 = self:sanitize_position(line1, col1)
-  line2, col2 = self:sanitize_position(line2 or line1, col2 or col1)
+  if not line2 then
+    line1, col1 = self:sanitize_position(line1, col1)
+    line2, col2 = line1, col1
+  else
+    if swap then line1, col1, line2, col2 = line2, col2, line1, col1 end
+    line1, col1 = self:sanitize_position(line1, col1)
+    line2, col2 = self:sanitize_position(line2, col2)
+  end
   self.selections = { line1, col1, line2, col2 }
 end
 
