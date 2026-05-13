@@ -348,13 +348,15 @@ end
 
 
 function Doc:raw_insert(line, col, text, undo_stack, time)
+  local lines = split_lines(text)
+  local line2 = line + #lines - 1
+  local col2 = (#lines == 1 and col or 1) + #lines[#lines]
+
   -- push undo
-  local line2, col2 = self:position_offset(line, col, #text)
   push_undo(undo_stack, time, "selection", table.unpack(self.selections))
   push_undo(undo_stack, time, "remove", line, col, line2, col2)
 
-  -- split text into lines and merge with line at insertion point
-  local lines = split_lines(text)
+  -- merge with line at insertion point
   local before = self.lines[line]:sub(1, col - 1)
   local after = self.lines[line]:sub(col)
   for i = 1, #lines - 1 do
