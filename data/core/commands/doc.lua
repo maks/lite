@@ -25,28 +25,32 @@ end
 
 
 local function insert_at_start_of_selected_lines(text, skip_empty)
-  local line1, col1, line2, col2, swap = doc():get_selection(true)
-  for line = line1, line2 do
-    local line_text = doc().lines[line]
-    if (not skip_empty or line_text:find("%S")) then
-      doc():insert(line, 1, text)
+  for i = 1, #doc().selections, 4 do
+    local l1, c1, l2, c2 = doc().selections[i], doc().selections[i+1], doc().selections[i+2], doc().selections[i+3]
+    if l1 > l2 or (l1 == l2 and c1 > c2) then l1, c1, l2, c2 = l2, c2, l1, c1 end
+    for line = l1, l2 do
+      local line_text = doc().lines[line]
+      if (not skip_empty or line_text:find("%S")) then
+        doc():insert(line, 1, text)
+      end
     end
   end
-  doc():set_selection(line1, col1 + #text, line2, col2 + #text, swap)
 end
 
 
 local function remove_from_start_of_selected_lines(text, skip_empty)
-  local line1, col1, line2, col2, swap = doc():get_selection(true)
-  for line = line1, line2 do
-    local line_text = doc().lines[line]
-    if  line_text:sub(1, #text) == text
-    and (not skip_empty or line_text:find("%S"))
-    then
-      doc():remove(line, 1, line, #text + 1)
+  for i = 1, #doc().selections, 4 do
+    local l1, c1, l2, c2 = doc().selections[i], doc().selections[i+1], doc().selections[i+2], doc().selections[i+3]
+    if l1 > l2 or (l1 == l2 and c1 > c2) then l1, c1, l2, c2 = l2, c2, l1, c1 end
+    for line = l1, l2 do
+      local line_text = doc().lines[line]
+      if  line_text:sub(1, #text) == text
+      and (not skip_empty or line_text:find("%S"))
+      then
+        doc():remove(line, 1, line, #text + 1)
+      end
     end
   end
-  doc():set_selection(line1, col1 - #text, line2, col2 - #text, swap)
 end
 
 
@@ -74,7 +78,11 @@ local commands = {
 
   ["doc:cut"] = function()
     if doc():has_selection() then
-      local text = doc():get_text(doc():get_selection())
+      local text = ""
+      for i = 1, #doc().selections, 4 do
+        local t = doc():get_text(doc().selections[i], doc().selections[i+1], doc().selections[i+2], doc().selections[i+3])
+        text = text .. (text == "" and "" or "\n") .. t
+      end
       system.set_clipboard(text)
       doc():delete_to(0)
     end
@@ -82,7 +90,11 @@ local commands = {
 
   ["doc:copy"] = function()
     if doc():has_selection() then
-      local text = doc():get_text(doc():get_selection())
+      local text = ""
+      for i = 1, #doc().selections, 4 do
+        local t = doc():get_text(doc().selections[i], doc().selections[i+1], doc().selections[i+2], doc().selections[i+3])
+        text = text .. (text == "" and "" or "\n") .. t
+      end
       system.set_clipboard(text)
     end
   end,
@@ -92,46 +104,37 @@ local commands = {
   end,
 
   ["doc:newline"] = function()
-    local line, col = doc():get_selection()
-    local indent = doc().lines[line]:match("^[\t ]*")
-    if col <= #indent then
-      indent = indent:sub(#indent + 2 - col)
+    if doc():has_selection() then doc():delete_to() end
+    for i = 1, #doc().selections, 4 do
+      local line, col = doc().selections[i], doc().selections[i+1]
+      local indent = doc().lines[line]:match("^[\t ]*")
+      if col <= #indent then
+        indent = indent:sub(#indent + 2 - col)
+      end
+      doc():insert(line, col, "\n" .. indent)
     end
-    doc():text_input("\n" .. indent)
-  end,
-
-  ["doc:newline-below"] = function()
-    local line = doc():get_selection()
-    local indent = doc().lines[line]:match("^[\t ]*")
-    doc():insert(line, math.huge, "\n" .. indent)
-    doc():set_selection(line + 1, math.huge)
-  end,
-
-  ["doc:newline-above"] = function()
-    local line = doc():get_selection()
-    local indent = doc().lines[line]:match("^[\t ]*")
-    doc():insert(line, 1, indent .. "\n")
-    doc():set_selection(line, math.huge)
   end,
 
   ["doc:delete"] = function()
-    local line, col = doc():get_selection()
-    if not doc():has_selection() and doc().lines[line]:find("^%s*$", col) then
-      doc():remove(line, col, line, math.huge)
-    end
     doc():delete_to(translate.next_char)
   end,
 
   ["doc:backspace"] = function()
-    local line, col = doc():get_selection()
-    if not doc():has_selection() then
-      local text = doc():get_text(line, 1, line, col)
-      if #text >= config.indent_size and text:find("^ *$") then
-        doc():delete_to(0, -config.indent_size)
-        return
-      end
-    end
     doc():delete_to(translate.previous_char)
+  end,
+
+  ["doc:create-cursor-above"] = function()
+    local _, _, line, col = doc():get_selection()
+    if line > 1 then
+      doc():add_selection(DocView.translate.previous_line(doc(), line, col, dv()))
+    end
+  end,
+
+  ["doc:create-cursor-below"] = function()
+    local _, _, line, col = doc():get_selection()
+    if line < #doc().lines then
+      doc():add_selection(DocView.translate.next_line(doc(), line, col, dv()))
+    end
   end,
 
   ["doc:select-all"] = function()
@@ -144,16 +147,21 @@ local commands = {
   end,
 
   ["doc:select-lines"] = function()
-    local line1, _, line2, _, swap = doc():get_selection(true)
-    append_line_if_last_line(line2)
-    doc():set_selection(line1, 1, line2 + 1, 1, swap)
+    for i = 1, #doc().selections, 4 do
+      local l1, c1, l2, c2 = doc().selections[i], doc().selections[i+1], doc().selections[i+2], doc().selections[i+3]
+      if l1 > l2 or (l1 == l2 and c1 > c2) then l1, c1, l2, c2 = l2, c2, l1, c1 end
+      append_line_if_last_line(l2)
+      doc():set_selection_at((i - 1) / 4 + 1, l1, 1, l2 + 1, 1)
+    end
   end,
 
   ["doc:select-word"] = function()
-    local line1, col1 = doc():get_selection(true)
-    local line1, col1 = translate.start_of_word(doc(), line1, col1)
-    local line2, col2 = translate.end_of_word(doc(), line1, col1)
-    doc():set_selection(line2, col2, line1, col1)
+    for i = 1, #doc().selections, 4 do
+      local l1, c1 = doc().selections[i], doc().selections[i+1]
+      local l1, c1 = translate.start_of_word(doc(), l1, c1)
+      local l2, c2 = translate.end_of_word(doc(), l1, c1)
+      doc():set_selection_at((i - 1) / 4 + 1, l2, c2, l1, c1)
+    end
   end,
 
   ["doc:join-lines"] = function()

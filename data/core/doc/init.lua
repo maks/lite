@@ -46,7 +46,7 @@ end
 
 function Doc:reset()
   self.lines = { "\n" }
-  self.selection = { a = { line=1, col=1 }, b = { line=1, col=1 } }
+  self.selections = { 1, 1, 1, 1 }
   self.undo_stack = { idx = 1 }
   self.redo_stack = { idx = 1 }
   self.clean_change_id = 1
@@ -124,8 +124,7 @@ function Doc:set_selection(line1, col1, line2, col2, swap)
   if swap then line1, col1, line2, col2 = line2, col2, line1, col1 end
   line1, col1 = self:sanitize_position(line1, col1)
   line2, col2 = self:sanitize_position(line2 or line1, col2 or col1)
-  self.selection.a.line, self.selection.a.col = line1, col1
-  self.selection.b.line, self.selection.b.col = line2, col2
+  self.selections = { line1, col1, line2, col2 }
 end
 
 
@@ -139,22 +138,105 @@ end
 
 
 function Doc:get_selection(sort)
-  local a, b = self.selection.a, self.selection.b
+  local n = #self.selections
+  local l1, c1, l2, c2 = self.selections[n-3], self.selections[n-2], self.selections[n-1], self.selections[n]
   if sort then
-    return sort_positions(a.line, a.col, b.line, b.col)
+    return sort_positions(l1, c1, l2, c2)
   end
-  return a.line, a.col, b.line, b.col
+  return l1, c1, l2, c2
+end
+
+
+function Doc:set_selection_at(idx, line1, col1, line2, col2, swap)
+  if swap then line1, col1, line2, col2 = line2, col2, line1, col1 end
+  line1, col1 = self:sanitize_position(line1, col1)
+  line2, col2 = self:sanitize_position(line2 or line1, col2 or col1)
+  local i = (idx - 1) * 4 + 1
+  self.selections[i] = line1
+  self.selections[i+1] = col1
+  self.selections[i+2] = line2
+  self.selections[i+3] = col2
 end
 
 
 function Doc:has_selection()
-  local a, b = self.selection.a, self.selection.b
-  return not (a.line == b.line and a.col == b.col)
+  for i = 1, #self.selections, 4 do
+    if self.selections[i] ~= self.selections[i+2] or self.selections[i+1] ~= self.selections[i+3] then
+      return true
+    end
+  end
+  return false
+end
+
+
+function Doc:add_selection(line1, col1, line2, col2, swap)
+  if swap then line1, col1, line2, col2 = line2, col2, line1, col1 end
+  line1, col1 = self:sanitize_position(line1, col1)
+  line2, col2 = self:sanitize_position(line2 or line1, col2 or col1)
+  table.insert(self.selections, line1)
+  table.insert(self.selections, col1)
+  table.insert(self.selections, line2)
+  table.insert(self.selections, col2)
+  self:sanitize_selection()
+end
+
+
+function Doc:remove_selection(idx)
+  table.remove(self.selections, (idx - 1) * 4 + 4)
+  table.remove(self.selections, (idx - 1) * 4 + 3)
+  table.remove(self.selections, (idx - 1) * 4 + 2)
+  table.remove(self.selections, (idx - 1) * 4 + 1)
 end
 
 
 function Doc:sanitize_selection()
-  self:set_selection(self:get_selection())
+  -- clamp selections to document bounds
+  for i = 1, #self.selections, 4 do
+    self.selections[i], self.selections[i+1] = self:sanitize_position(self.selections[i], self.selections[i+1])
+    self.selections[i+2], self.selections[i+3] = self:sanitize_position(self.selections[i+2], self.selections[i+3])
+  end
+
+  -- sort each individual selection so (l1, c1) is the start and (l2, c2) is the end
+  -- and also collect them into a sortable list of objects
+  local sorted = {}
+  for i = 1, #self.selections, 4 do
+    local l1, c1, l2, c2 = self.selections[i], self.selections[i+1], self.selections[i+2], self.selections[i+3]
+    local swap = l1 > l2 or (l1 == l2 and c1 > c2)
+    if swap then l1, c1, l2, c2 = l2, c2, l1, c1 end
+    table.insert(sorted, { l1 = l1, c1 = c1, l2 = l2, c2 = c2, swap = swap })
+  end
+
+  -- sort selections by their start position
+  table.sort(sorted, function(a, b)
+    if a.l1 ~= b.l1 then return a.l1 < b.l1 end
+    return a.c1 < b.c1
+  end)
+
+  -- merge overlapping or adjacent selections
+  local i = 1
+  while i < #sorted do
+    local a, b = sorted[i], sorted[i+1]
+    if b.l1 < a.l2 or (b.l1 == a.l2 and b.c1 <= a.c2) then
+      if b.l2 > a.l2 or (b.l2 == a.l2 and b.c2 > a.c2) then
+        a.l2, a.c2 = b.l2, b.c2
+      end
+      table.remove(sorted, i + 1)
+    else
+      i = i + 1
+    end
+  end
+
+  -- flatten back into self.selections
+  self.selections = {}
+  for _, s in ipairs(sorted) do
+    if s.swap then
+      table.insert(self.selections, s.l2); table.insert(self.selections, s.c2)
+      table.insert(self.selections, s.l1); table.insert(self.selections, s.c1)
+    else
+      table.insert(self.selections, s.l1); table.insert(self.selections, s.c1)
+      table.insert(self.selections, s.l2); table.insert(self.selections, s.c2)
+    end
+  end
 end
 
 
@@ -249,8 +331,7 @@ local function pop_undo(self, undo_stack, redo_stack)
     self:raw_remove(line1, col1, line2, col2, redo_stack, cmd.time)
 
   elseif cmd.type == "selection" then
-    self.selection.a.line, self.selection.a.col = cmd[1], cmd[2]
-    self.selection.b.line, self.selection.b.col = cmd[3], cmd[4]
+    self.selections = { table.unpack(cmd) }
   end
 
   -- if next undo command is within the merge timeout then treat as a single
@@ -263,6 +344,11 @@ end
 
 
 function Doc:raw_insert(line, col, text, undo_stack, time)
+  -- push undo
+  local line2, col2 = self:position_offset(line, col, #text)
+  push_undo(undo_stack, time, "selection", table.unpack(self.selections))
+  push_undo(undo_stack, time, "remove", line, col, line2, col2)
+
   -- split text into lines and merge with line at insertion point
   local lines = split_lines(text)
   local before = self.lines[line]:sub(1, col - 1)
@@ -276,10 +362,17 @@ function Doc:raw_insert(line, col, text, undo_stack, time)
   -- splice lines into line array
   splice(self.lines, line, 1, lines)
 
-  -- push undo
-  local line2, col2 = self:position_offset(line, col, #text)
-  push_undo(undo_stack, time, "selection", self:get_selection())
-  push_undo(undo_stack, time, "remove", line, col, line2, col2)
+  -- shift trailing selections
+  local line_diff = line2 - line
+  local col_diff = col2 - col
+  for i = 1, #self.selections, 2 do
+    local l, c = self.selections[i], self.selections[i+1]
+    if l > line then
+      self.selections[i] = l + line_diff
+    elseif l == line and c >= col then
+      self.selections[i], self.selections[i+1] = l + line_diff, c + col_diff
+    end
+  end
 
   -- update highlighter and assure selection is in bounds
   self.highlighter:invalidate(line)
@@ -290,7 +383,7 @@ end
 function Doc:raw_remove(line1, col1, line2, col2, undo_stack, time)
   -- push undo
   local text = self:get_text(line1, col1, line2, col2)
-  push_undo(undo_stack, time, "selection", self:get_selection())
+  push_undo(undo_stack, time, "selection", table.unpack(self.selections))
   push_undo(undo_stack, time, "insert", line1, col1, text)
 
   -- get line content before/after removed text
@@ -299,6 +392,20 @@ function Doc:raw_remove(line1, col1, line2, col2, undo_stack, time)
 
   -- splice line into line array
   splice(self.lines, line1, line2 - line1 + 1, { before .. after })
+
+  -- shift trailing selections
+  local line_diff = line2 - line1
+  local col_diff = col2 - col1
+  for i = 1, #self.selections, 2 do
+    local l, c = self.selections[i], self.selections[i+1]
+    if l > line2 then
+      self.selections[i] = l - line_diff
+    elseif l == line2 and c >= col2 then
+      self.selections[i], self.selections[i+1] = l - line_diff, c - col_diff
+    elseif l > line1 or (l == line1 and c > col1) then
+      self.selections[i], self.selections[i+1] = line1, col1
+    end
+  end
 
   -- update highlighter and assure selection is in bounds
   self.highlighter:invalidate(line1)
@@ -336,57 +443,65 @@ function Doc:text_input(text)
   if self:has_selection() then
     self:delete_to()
   end
-  local line, col = self:get_selection()
-  self:insert(line, col, text)
-  self:move_to(#text)
+  for i = 1, #self.selections, 4 do
+    local line, col = self.selections[i], self.selections[i+1]
+    self:insert(line, col, text)
+  end
 end
 
 
 function Doc:replace(fn)
-  local line1, col1, line2, col2, swap
-  local had_selection = self:has_selection()
-  if had_selection then
-    line1, col1, line2, col2, swap = self:get_selection(true)
-  else
-    line1, col1, line2, col2 = 1, 1, #self.lines, #self.lines[#self.lines]
-  end
-  local old_text = self:get_text(line1, col1, line2, col2)
-  local new_text, n = fn(old_text)
-  if old_text ~= new_text then
-    self:insert(line2, col2, new_text)
-    self:remove(line1, col1, line2, col2)
-    if had_selection then
-      line2, col2 = self:position_offset(line1, col1, #new_text)
-      self:set_selection(line1, col1, line2, col2, swap)
+  local n_accum = 0
+  for i = 1, #self.selections, 4 do
+    local l1, c1, l2, c2 = self.selections[i], self.selections[i+1], self.selections[i+2], self.selections[i+3]
+    local line1, col1, line2, col2, swap = sort_positions(l1, c1, l2, c2)
+    local old_text = self:get_text(line1, col1, line2, col2)
+    local new_text, n = fn(old_text)
+    if old_text ~= new_text then
+      self:insert(line2, col2, new_text)
+      self:remove(line1, col1, line2, col2)
     end
+    n_accum = n_accum + (n or 0)
   end
-  return n
+  return n_accum
 end
 
 
 function Doc:delete_to(...)
-  local line, col = self:get_selection(true)
   if self:has_selection() then
-    self:remove(self:get_selection())
+    for i = 1, #self.selections, 4 do
+      local l1, c1, l2, c2 = self.selections[i], self.selections[i+1], self.selections[i+2], self.selections[i+3]
+      if l1 ~= l2 or c1 ~= c2 then
+        self:remove(l1, c1, l2, c2)
+      end
+    end
   else
-    local line2, col2 = self:position_offset(line, col, ...)
-    self:remove(line, col, line2, col2)
-    line, col = sort_positions(line, col, line2, col2)
+    for i = 1, #self.selections, 4 do
+      local l1, c1 = self.selections[i], self.selections[i+1]
+      local l2, c2 = self.position_offset(self, l1, c1, ...)
+      self:remove(l1, c1, l2, c2)
+    end
   end
-  self:set_selection(line, col)
 end
 
 
 function Doc:move_to(...)
-  local line, col = self:get_selection()
-  self:set_selection(self:position_offset(line, col, ...))
+  for i = 1, #self.selections, 4 do
+    local line, col = self.selections[i], self.selections[i+1]
+    line, col = self:position_offset(line, col, ...)
+    self.selections[i], self.selections[i+1], self.selections[i+2], self.selections[i+3] = line, col, line, col
+  end
+  self:sanitize_selection()
 end
 
 
 function Doc:select_to(...)
-  local line, col, line2, col2 = self:get_selection()
-  line, col = self:position_offset(line, col, ...)
-  self:set_selection(line, col, line2, col2)
+  for i = 1, #self.selections, 4 do
+    local line, col = self.selections[i], self.selections[i+1]
+    line, col = self:position_offset(line, col, ...)
+    self.selections[i], self.selections[i+1] = line, col
+  end
+  self:sanitize_selection()
 end
 
 

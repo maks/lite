@@ -149,6 +149,8 @@ keymap.add {
   ["ctrl+/"] = "doc:toggle-line-comments",
   ["ctrl+up"] = "doc:move-lines-up",
   ["ctrl+down"] = "doc:move-lines-down",
+  ["alt+shift+up"] = "doc:create-cursor-above",
+  ["alt+shift+down"] = "doc:create-cursor-below",
   ["ctrl+shift+d"] = "doc:duplicate-lines",
   ["ctrl+shift+k"] = "doc:delete-lines",
 
