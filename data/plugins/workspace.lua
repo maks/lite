@@ -1,7 +1,25 @@
 local core = require "core"
 local DocView = require "core.docview"
 
-local workspace_filename = ".lite_workspace.lua"
+local home = os.getenv("HOME") or os.getenv("USERPROFILE") or "."
+local workspace_dir = home .. PATHSEP .. ".lite" .. PATHSEP .. "workspaces"
+
+
+local function hash(str)
+  local h = 0x811c9dc5
+  for i = 1, #str do
+    h = bit32.bxor(h, str:byte(i))
+    h = (h * 0x01000193) % 0x100000000
+  end
+  return string.format("%08x", h)
+end
+
+
+local function get_workspace_filename()
+  local path = system.absolute_path(".")
+  if not path then return nil end
+  return workspace_dir .. PATHSEP .. hash(path) .. ".lua"
+end
 
 
 local function serialize(val)
@@ -124,8 +142,18 @@ end
 
 
 local function save_workspace()
+  local filename = get_workspace_filename()
+  if not filename then return end
+  if not system.get_file_info(workspace_dir) then
+    if PLATFORM == "Windows" then
+      os.execute('mkdir "' .. home .. PATHSEP .. '.lite" 2>nul')
+      os.execute('mkdir "' .. workspace_dir .. '" 2>nul')
+    else
+      os.execute('mkdir -p "' .. workspace_dir .. '"')
+    end
+  end
   local root = get_unlocked_root(core.root_view.root_node)
-  local fp = io.open(workspace_filename, "w")
+  local fp = io.open(filename, "w")
   if fp then
     fp:write("return ", serialize(save_node(root)), "\n")
     fp:close()
@@ -134,8 +162,10 @@ end
 
 
 local function load_workspace()
-  local ok, t = pcall(dofile, workspace_filename)
-  os.remove(workspace_filename)
+  local filename = get_workspace_filename()
+  if not filename then return end
+  local ok, t = pcall(dofile, filename)
+  os.remove(filename)
   if ok then
     local root = get_unlocked_root(core.root_view.root_node)
     local active_view = load_node(root, t)
