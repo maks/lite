@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512">
+  <rect width="64" height="64" rx="12" fill="#1e1e2e"/>
+
+  <!-- Bar 1: white -->
+  <rect x="10" y="12" width="24" height="3" rx="1.5" fill="#ffffff"/>
+
+  <!-- Bar 2: orange -->
+  <rect x="38" y="12" width="16" height="3" rx="1.5" fill="#f9a03f"/>
+
+  <!-- Bar 3: yellow -->
+  <rect x="10" y="20" width="30" height="3" rx="1.5" fill="#e6c547"/>
+
+  <!-- Bar 4: pink/magenta -->
+  <rect x="10" y="28" width="38" height="3" rx="1.5" fill="#f278b9"/>
+
+  <!-- Bar 5: red -->
+  <rect x="10" y="36" width="18" height="3" rx="1.5" fill="#f38ba3"/>
+
+  <!-- Bar 6: blue -->
+  <rect x="32" y="36" width="14" height="3" rx="1.5" fill="#89b4fa"/>
+
+  <!-- Bar 7: white -->
+  <rect x="10" y="44" width="28" height="3" rx="1.5" fill="#ffffff"/>
+
+  <!-- Bar 8: orange -->
+  <rect x="42" y="44" width="12" height="3" rx="1.5" fill="#f9a03f"/>
+
+  <!-- Bar 9: pink -->
+  <rect x="10" y="52" width="20" height="3" rx="1.5" fill="#f278b9"/>
+</svg>
