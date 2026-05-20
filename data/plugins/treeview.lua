@@ -185,6 +185,35 @@ function TreeView:draw()
     -- text
     x = x + spacing
     x = common.draw_text(style.font, color, item.name, nil, x, y, 0, h)
+
+    -- git status indicator
+    if item.type ~= "dir" then
+      local status = core.git and core.git.file_status and core.git.file_status[item.abs_filename]
+      if status then
+        local indicator = " "
+        local indicator_color = style.text
+        if (status.staged == "?" and status.unstaged == "?") then
+          indicator = "?"
+          indicator_color = style.warning
+        elseif (status.staged == "M" or status.unstaged == "M") then
+          indicator = "M"
+          indicator_color = style.accent
+        elseif (status.staged == "A" or status.unstaged == "A") then
+          indicator = "A"
+          indicator_color = style.info
+        elseif (status.staged == "D" or status.unstaged == "D") then
+          indicator = "D"
+          indicator_color = style.error
+        elseif (status.staged == "R" or status.unstaged == "R") then
+          indicator = "R"
+          indicator_color = style.accent
+        end
+        if indicator ~= " " then
+          x = x + 1
+          common.draw_text(style.font, indicator_color, " (" .. indicator .. ")", nil, x, y, 0, h)
+        end
+      end
+    end
   end
 end
 

@@ -8,6 +8,7 @@ local git = {
   branch = nil,
   inserts = 0,
   deletes = 0,
+  file_status = {},
 }
 
 
@@ -34,13 +35,32 @@ core.add_thread(function()
       git.inserts = tonumber(line:match("(%d+) ins")) or 0
       git.deletes = tonumber(line:match("(%d+) del")) or 0
 
+      -- per-file status
+      local porcelain = exec("git status --porcelain", 1)
+      git.file_status = {}
+      for line in porcelain:gmatch("[^\r\n]+") do
+        local staged = line:sub(1, 1)
+        local unstaged = line:sub(2, 2)
+        local path = line:sub(4)
+        -- ignore empty paths and rename/copy detection lines
+        if path ~= "" and not path:find(" -> ") then
+          local abs = system.absolute_path(path)
+          if abs then
+            git.file_status[abs] = { staged = staged, unstaged = unstaged }
+          end
+        end
+      end
+
     else
       git.branch = nil
+      git.file_status = {}
     end
 
     coroutine.yield(config.project_scan_rate)
   end
 end)
+
+core.git = git
 
 
 local get_items = StatusView.get_items
