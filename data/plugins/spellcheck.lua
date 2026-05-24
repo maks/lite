@@ -13,6 +13,14 @@ else
   config.dictionary_file = "/usr/share/dict/words"
 end
 
+-- User dictionary file for custom words (writable by the user)
+local home = os.getenv("HOME")
+if home then
+  config.user_dictionary_file = home .. "/.lite_user_words"
+else
+  config.user_dictionary_file = nil
+end
+
 
 local last_input_time = 0
 local word_pattern = "%a+"
@@ -27,6 +35,18 @@ core.add_thread(function()
     end
     i = i + 1
     if i % 1000 == 0 then coroutine.yield() end
+  end
+  -- Load user dictionary and merge (user words take precedence)
+  if config.user_dictionary_file then
+    local user_file = io.open(config.user_dictionary_file, "r")
+    if user_file then
+      for line in user_file:lines() do
+        for word in line:gmatch(word_pattern) do
+          t[word:lower()] = true
+        end
+      end
+      user_file:close()
+    end
   end
   words = t
   core.redraw = true
@@ -119,11 +139,11 @@ command.add("core.docview", {
       return
     end
     if word then
-      local fp = assert(io.open(config.dictionary_file, "a"))
+      local fp = assert(io.open(config.user_dictionary_file, "a"))
       fp:write("\n" .. word .. "\n")
       fp:close()
       words[word] = true
-      core.log("Added \"%s\" to dictionary", word)
+      core.log("Added \"%s\" to user dictionary (%s)", word, config.user_dictionary_file)
     end
   end,
 
